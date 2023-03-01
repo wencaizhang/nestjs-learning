@@ -23,6 +23,7 @@
     "@nestjs/common": "^9.0.0",
     "@nestjs/core": "^9.0.0",
     "@nestjs/platform-express": "^9.0.0",
+    "@nestjs/platform-fastify": "^9.3.9",
     "@nestjs/typeorm": "^9.0.1",
     "deepmerge": "^4.3.0",
     "lodash": "^4.17.21",
