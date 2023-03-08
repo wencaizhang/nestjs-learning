@@ -16,14 +16,9 @@ export const paginate = async <E extends ObjectLiteral>(
   qb.take(options.limit).skip(start * options.limit);
   const items = await qb.getMany();
   const totalPages = Math.ceil(totalItems / options.limit);
-  // TODO
-  // 1. 这个地方应该是忽略了 totalItems 为 0 的情况
-  //    按照目前的计算方式 totalItems 为 0 时会得出 remainder = itemCount = options.limit 的结果
-
-  // 2. 为什么 itemCount 不直接取 items.length 而是要这样来回计算。
-  const remainder = totalItems % options.limit !== 0 ? totalItems % options.limit : options.limit;
-  const itemCount = options.page < totalPages ? options.limit : remainder;
-
+  const itemCount =
+    // eslint-disable-next-line no-nested-ternary
+    options.page < totalPages ? options.limit : options.page === totalPages ? totalItems : 0;
   return {
     items,
     meta: {
@@ -35,3 +30,36 @@ export const paginate = async <E extends ObjectLiteral>(
     },
   };
 };
+
+/**
+ * 数据手动分页函数
+ * @param options 分页选项
+ * @param data 数据列表
+ */
+export function manualPaginate<E extends ObjectLiteral>(
+  options: PaginateOptions,
+  data: E[],
+): PaginateReturn<E> {
+  const { page, limit } = options;
+  let items: E[] = [];
+  const totalItems = data.length;
+  const totalRst = totalItems / limit;
+  const totalPages =
+    totalRst > Math.floor(totalRst) ? Math.floor(totalRst) + 1 : Math.floor(totalRst);
+  let itemCount = 0;
+  if (page <= totalPages) {
+    itemCount = page === totalPages ? totalItems - (totalPages - 1) * limit : limit;
+    const start = (page - 1) * limit;
+    items = data.slice(start, start + itemCount);
+  }
+  return {
+    meta: {
+      itemCount,
+      totalItems,
+      perPage: limit,
+      totalPages,
+      currentPage: page,
+    },
+    items,
+  };
+}

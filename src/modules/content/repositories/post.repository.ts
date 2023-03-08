@@ -2,11 +2,20 @@ import { Repository } from 'typeorm';
 
 import { CustomRepository } from '@/modules/database/decorators';
 
-import { PostEntity } from '../entities';
+import { CommentEntity, PostEntity } from '../entities';
 
 @CustomRepository(PostEntity)
 export class PostRepository extends Repository<PostEntity> {
   buildBaseQB() {
-    return this.createQueryBuilder('post');
+    // 在查询之前先查询出评论数量再添加到commentCount字段上
+    return this.createQueryBuilder('post')
+      .leftJoinAndSelect('post.categories', 'categories')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(c.id)', 'count')
+          .from(CommentEntity, 'c')
+          .where('c.post.id = post.id');
+      }, 'commentCount')
+      .loadRelationCountAndMap('post.commentCount', 'post.comments');
   }
 }

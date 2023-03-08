@@ -1,14 +1,20 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
 import {
   BaseEntity,
   Column,
   CreateDateColumn,
   Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 import { PostBodyType } from '../constants';
+
+import { CategoryEntity } from './category.entity';
+import { CommentEntity } from './comment.entity';
 
 /**
  * 文章模型
@@ -58,14 +64,33 @@ export class PostEntity extends BaseEntity {
   customOrder: number;
 
   @Expose()
+  @Type(() => Date)
   @CreateDateColumn({
     comment: '创建时间',
   })
   createdAt: Date;
 
   @Expose()
+  @Type(() => Date)
   @UpdateDateColumn({
     comment: '更新时间',
   })
   updatedAt: Date;
+
+  @Expose()
+  commentCount: number;
+
+  @Expose()
+  @Type(() => CategoryEntity)
+  @ManyToMany(() => CategoryEntity, (category) => category.posts, {
+    // 在新增文章时,如果所属分类不存在则直接创建
+    cascade: true,
+  })
+  @JoinTable()
+  categories: CategoryEntity[];
+
+  @OneToMany((type) => CommentEntity, (comment) => comment.post, {
+    cascade: true,
+  })
+  comments: CommentEntity[];
 }

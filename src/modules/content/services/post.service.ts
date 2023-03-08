@@ -1,30 +1,43 @@
 import { Injectable } from '@nestjs/common';
 
-import { isFunction, isNil, omit } from 'lodash';
+import { isArray, isFunction, isNil, omit } from 'lodash';
 
-import { EntityNotFoundError, IsNull, Not, SelectQueryBuilder } from 'typeorm';
+import { In, IsNull, Not, SelectQueryBuilder, EntityNotFoundError } from 'typeorm';
 
 import { paginate } from '@/modules/database/helpers';
+import { QueryHook } from '@/modules/database/types';
 
-import { PaginateOptions, QueryHook } from '../../database/types';
 import { PostOrderType } from '../constants';
 
+import { CreatePostDto, QueryPostDto, UpdatePostDto } from '../dtos/post.dto';
 import { PostEntity } from '../entities/post.entity';
+import { CategoryRepository } from '../repositories/category.repository';
 import { PostRepository } from '../repositories/post.repository';
+
+import { CategoryService } from './category.service';
+
+// 文章查询接口
+type FindParams = {
+  [key in keyof Omit<QueryPostDto, 'limit' | 'page'>]: QueryPostDto[key];
+};
 
 /**
  * 文章数据操作
  */
 @Injectable()
 export class PostService {
-  constructor(protected repository: PostRepository) {}
+  constructor(
+    protected repository: PostRepository,
+    protected categoryRepository: CategoryRepository,
+    protected categoryService: CategoryService,
+  ) {}
 
   /**
    * 获取分页数据
    * @param options 分页选项
    * @param callback 添加额外的查询
    */
-  async paginate(options: PaginateOptions, callback?: QueryHook<PostEntity>) {
+  async paginate(options: QueryPostDto, callback?: QueryHook<PostEntity>) {
     const qb = await this.buildListQuery(this.repository.buildBaseQB(), options, callback);
     return paginate(qb, options);
   }
@@ -47,8 +60,17 @@ export class PostService {
    * 创建文章
    * @param data
    */
-  async create(data: Record<string, any>) {
-    const item = await this.repository.save(data);
+  async create(data: CreatePostDto) {
+    const createPostDto = {
+      ...data,
+      // 文章所属分类
+      categories: isArray(data.categories)
+        ? await this.categoryRepository.findBy({
+            id: In(data.categories),
+          })
+        : [],
+    };
+    const item = await this.repository.save(createPostDto);
 
     return this.detail(item.id);
   }
@@ -57,8 +79,17 @@ export class PostService {
    * 更新文章
    * @param data
    */
-  async update(data: Record<string, any>) {
-    await this.repository.update(data.id, omit(data, ['id']));
+  async update(data: UpdatePostDto) {
+    const post = await this.detail(data.id);
+    if (isArray(data.categories)) {
+      // 更新文章所属分类
+      await this.repository
+        .createQueryBuilder('post')
+        .relation(PostEntity, 'categories')
+        .of(post)
+        .addAndRemove(data.categories, post.categories ?? []);
+    }
+    await this.repository.update(data.id, omit(data, ['id', 'categories']));
     return this.detail(data.id);
   }
 
@@ -79,10 +110,10 @@ export class PostService {
    */
   protected async buildListQuery(
     qb: SelectQueryBuilder<PostEntity>,
-    options: Record<string, any>,
+    options: FindParams,
     callback?: QueryHook<PostEntity>,
   ) {
-    const { orderBy, isPublished } = options;
+    const { category, orderBy, isPublished } = options;
     if (typeof isPublished === 'boolean') {
       isPublished
         ? qb.where({
@@ -94,7 +125,9 @@ export class PostService {
     }
 
     this.queryOrderBy(qb, orderBy);
-
+    if (category) {
+      await this.queryByCategory(category, qb);
+    }
     if (callback) return callback(qb);
     return qb;
   }
@@ -112,13 +145,31 @@ export class PostService {
         return qb.orderBy('post.updatedAt', 'DESC');
       case PostOrderType.PUBLISHED:
         return qb.orderBy('post.publishedAt', 'DESC');
+      case PostOrderType.COMMENTCOUNT:
+        return qb.orderBy('commentCount', 'DESC');
       case PostOrderType.CUSTOM:
         return qb.orderBy('customOrder', 'DESC');
       default:
         return qb
           .orderBy('post.createdAt', 'DESC')
           .addOrderBy('post.updatedAt', 'DESC')
-          .addOrderBy('post.publishedAt', 'DESC');
+          .addOrderBy('post.publishedAt', 'DESC')
+          .addOrderBy('commentCount', 'DESC');
     }
+  }
+
+  /**
+   * 查询出分类及其后代分类下的所有文章的Query构建
+   * @param id
+   * @param qb
+   */
+  protected async queryByCategory(id: string, qb: SelectQueryBuilder<PostEntity>) {
+    const root = await this.categoryService.detail(id);
+    const tree = await this.categoryRepository.findDescendantsTree(root);
+    const flatDes = await this.categoryRepository.toFlatTrees(tree.children);
+    const ids = [tree.id, ...flatDes.map((item) => item.id)];
+    return qb.where('categories.id IN (:...ids)', {
+      ids,
+    });
   }
 }
