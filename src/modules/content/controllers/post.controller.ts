@@ -9,11 +9,13 @@ import {
   Post,
   Query,
   SerializeOptions,
-  ValidationPipe,
 } from '@nestjs/common';
 
-import { CreatePostDto, QueryPostDto, UpdatePostDto } from '../dtos';
+import { DeleteWithTrashDto, RestoreDto } from '@/modules/restful/dtos';
 
+import { CreatePostDto, QueryPostDto } from '../dtos';
+
+import { UpdatePostDto } from '../dtos/post.dto';
 import { PostService } from '../services';
 
 @Controller('posts')
@@ -23,13 +25,7 @@ export class PostController {
   @Get()
   @SerializeOptions({ groups: ['post-list'] })
   async list(
-    @Query(
-      new ValidationPipe({
-        transform: true,
-        forbidUnknownValues: true,
-        validationError: { target: false },
-      }),
-    )
+    @Query()
     options: QueryPostDto,
   ) {
     return this.service.paginate(options);
@@ -47,14 +43,7 @@ export class PostController {
   @Post()
   @SerializeOptions({ groups: ['post-detail'] })
   async store(
-    @Body(
-      new ValidationPipe({
-        transform: true,
-        forbidUnknownValues: true,
-        validationError: { target: false },
-        groups: ['create'],
-      }),
-    )
+    @Body()
     data: CreatePostDto,
   ) {
     return this.service.create(data);
@@ -63,22 +52,29 @@ export class PostController {
   @Patch()
   @SerializeOptions({ groups: ['post-detail'] })
   async update(
-    @Body(
-      new ValidationPipe({
-        transform: true,
-        forbidUnknownValues: true,
-        validationError: { target: false },
-        groups: ['update'],
-      }),
-    )
+    @Body()
     data: UpdatePostDto,
   ) {
     return this.service.update(data);
   }
 
-  @Delete(':id')
-  @SerializeOptions({ groups: ['post-detail'] })
-  async delete(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.service.delete(id);
+  @Delete()
+  @SerializeOptions({ groups: ['post-list'] })
+  async delete(
+    @Body()
+    data: DeleteWithTrashDto,
+  ) {
+    const { ids, trash } = data;
+    return this.service.delete(ids, trash);
+  }
+
+  @Patch('restore')
+  @SerializeOptions({ groups: ['post-list'] })
+  async restore(
+    @Body()
+    data: RestoreDto,
+  ) {
+    const { ids } = data;
+    return this.service.restore(ids);
   }
 }

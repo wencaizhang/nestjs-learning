@@ -18,6 +18,7 @@ import { isNil, toNumber } from 'lodash';
 
 import { toBoolean } from '@/modules/core/helpers';
 
+import { SelectTrashMode } from '@/modules/database/constants';
 import { PaginateOptions } from '@/modules/database/types';
 
 import { PostOrderType } from '../constants';
@@ -52,6 +53,10 @@ export class QueryPostDto implements PaginateOptions {
   @IsUUID(undefined, { message: '分类ID格式错误' })
   @IsOptional()
   category?: string;
+
+  @IsEnum(SelectTrashMode)
+  @IsOptional()
+  trashed?: SelectTrashMode;
 }
 
 /**
