@@ -16,17 +16,39 @@ import {
 
 import { isNil, toNumber } from 'lodash';
 
+import { DtoValidation } from '@/modules/core/decorators';
 import { toBoolean } from '@/modules/core/helpers';
 
 import { SelectTrashMode } from '@/modules/database/constants';
+import { IsDataExist } from '@/modules/database/constraints';
 import { PaginateOptions } from '@/modules/database/types';
 
 import { PostOrderType } from '../constants';
+import { CategoryEntity } from '../entities';
 
 /**
  * 文章分页查询验证
  */
+@DtoValidation({ type: 'query' })
 export class QueryPostDto implements PaginateOptions {
+  @IsEnum(SelectTrashMode)
+  @IsOptional()
+  trashed?: SelectTrashMode;
+
+  @MaxLength(100, {
+    always: true,
+    message: '搜索字符串长度不得超过$constraint1',
+  })
+  @IsOptional({ always: true })
+  search?: string;
+
+  @IsDataExist(CategoryEntity, {
+    message: '指定的分类不存在',
+  })
+  @IsUUID(undefined, { message: '分类ID格式错误' })
+  @IsOptional()
+  category?: string;
+
   @Transform(({ value }) => toBoolean(value))
   @IsBoolean()
   @IsOptional()
@@ -49,19 +71,12 @@ export class QueryPostDto implements PaginateOptions {
   @IsNumber()
   @IsOptional()
   limit = 10;
-
-  @IsUUID(undefined, { message: '分类ID格式错误' })
-  @IsOptional()
-  category?: string;
-
-  @IsEnum(SelectTrashMode)
-  @IsOptional()
-  trashed?: SelectTrashMode;
 }
 
 /**
  * 文章创建验证
  */
+@DtoValidation({ groups: ['create'] })
 export class CreatePostDto {
   @MaxLength(255, {
     always: true,
@@ -96,6 +111,11 @@ export class CreatePostDto {
   @IsOptional({ always: true })
   keywords?: string[];
 
+  @IsDataExist(CategoryEntity, {
+    each: true,
+    always: true,
+    message: '分类不存在',
+  })
   @IsUUID(undefined, {
     each: true,
     always: true,
@@ -114,6 +134,7 @@ export class CreatePostDto {
 /**
  * 文章更新验证
  */
+@DtoValidation({ groups: ['update'] })
 export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsUUID(undefined, { groups: ['update'], message: '文章ID格式错误' })
   @IsDefined({ groups: ['update'], message: '文章ID必须指定' })
