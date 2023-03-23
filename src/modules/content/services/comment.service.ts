@@ -2,9 +2,9 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 
 import { isNil } from 'lodash';
 
-import { EntityNotFoundError, In, SelectQueryBuilder } from 'typeorm';
+import { EntityNotFoundError, SelectQueryBuilder } from 'typeorm';
 
-import { manualPaginate } from '@/modules/database/helpers';
+import { BaseService } from '@/modules/database/base';
 
 import { CreateCommentDto, QueryCommentDto, QueryCommentTreeDto } from '../dtos';
 import { CommentEntity } from '../entities/comment.entity';
@@ -15,8 +15,10 @@ import { PostRepository } from '../repositories/post.repository';
  * 评论数据操作
  */
 @Injectable()
-export class CommentService {
-  constructor(protected repository: CommentRepository, protected postRepository: PostRepository) {}
+export class CommentService extends BaseService<CommentEntity, CommentRepository> {
+  constructor(protected repository: CommentRepository, protected postRepository: PostRepository) {
+    super(repository);
+  }
 
   /**
    * 直接查询评论树
@@ -24,7 +26,7 @@ export class CommentService {
    */
   async findTrees(options: QueryCommentTreeDto = {}) {
     return this.repository.findTrees({
-      addQuery: (qb) => {
+      addQuery: async (qb) => {
         return isNil(options.post) ? qb : qb.where('post.id = :id', { id: options.post });
       },
     });
@@ -34,27 +36,17 @@ export class CommentService {
    * 查找一篇文章的评论并分页
    * @param dto
    */
-  async paginate(dto: QueryCommentDto) {
-    const { post, ...query } = dto;
-    const addQuery = (qb: SelectQueryBuilder<CommentEntity>) => {
+  async paginate(options: QueryCommentDto) {
+    const { post } = options;
+    const addQuery = async (qb: SelectQueryBuilder<CommentEntity>) => {
       const condition: Record<string, string> = {};
       if (!isNil(post)) condition.post = post;
       return Object.keys(condition).length > 0 ? qb.andWhere(condition) : qb;
     };
-    const data = await this.repository.findRoots({
+    return super.paginate({
+      ...options,
       addQuery,
     });
-    let comments: CommentEntity[] = [];
-    for (let i = 0; i < data.length; i++) {
-      const c = data[i];
-      comments.push(
-        await this.repository.findDescendantsTree(c, {
-          addQuery,
-        }),
-      );
-    }
-    comments = await this.repository.toFlatTrees(comments);
-    return manualPaginate(query, comments);
   }
 
   /**
@@ -73,24 +65,6 @@ export class CommentService {
       post: await this.getPost(data.post),
     });
     return this.repository.findOneOrFail({ where: { id: item.id } });
-  }
-
-  // /**
-  //  * 删除评论
-  //  * @param id
-  //  */
-  // async delete(id: string) {
-  //   const comment = await this.repository.findOneOrFail({ where: { id: id ?? null } });
-  //   return this.repository.remove(comment);
-  // }
-
-  /**
-   * 删除评论
-   * @param ids
-   */
-  async delete(ids: string[]) {
-    const comments = await this.repository.find({ where: { id: In(ids) } });
-    return this.repository.remove(comments);
   }
 
   /**

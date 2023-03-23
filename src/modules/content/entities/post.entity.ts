@@ -1,6 +1,5 @@
 import { Exclude, Expose, Type } from 'class-transformer';
 import {
-  BaseEntity,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -12,6 +11,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
+import { BaseEntity } from '@/modules/database/base';
 
 import { PostBodyType } from '../constants';
 

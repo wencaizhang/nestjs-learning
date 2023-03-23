@@ -1,6 +1,5 @@
 import { Exclude, Expose, Type } from 'class-transformer';
 import {
-  BaseEntity,
   Column,
   CreateDateColumn,
   Entity,
@@ -10,6 +9,8 @@ import {
   TreeChildren,
   TreeParent,
 } from 'typeorm';
+
+import { BaseEntity } from '@/modules/database/base';
 
 import { PostEntity } from './post.entity';
 

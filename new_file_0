@@ -1,0 +1,8 @@
+async cancelTask(taskId: string): Promise<void> {
+  const task = await this.taskModel.findById(taskId);
+  if (!task) {
+    throw new NotFoundException(`Task with ID "${taskId}" not found`);
+  }
+  task.status = TaskStatus.CANCELLED;
+  await task.save();
+}

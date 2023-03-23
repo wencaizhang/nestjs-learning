@@ -1,6 +1,5 @@
 import { Exclude, Expose, Type } from 'class-transformer';
 import {
-  BaseEntity,
   Column,
   DeleteDateColumn,
   Entity,
@@ -12,8 +11,9 @@ import {
   TreeParent,
 } from 'typeorm';
 
-import { PostEntity } from './post.entity';
+import { BaseEntity } from '@/modules/database/base';
 
+import { PostEntity } from './post.entity';
 /**
  * 树形嵌套分类
  */
